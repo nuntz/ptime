@@ -24,3 +24,14 @@ pub enum PtimeError {
     #[error("EXIF error: {0}")]
     Exif(String),
 }
+
+impl PtimeError {
+    pub fn exit_code(&self) -> i32 {
+        match self {
+            PtimeError::Io(_)
+            | PtimeError::CanonicalizationError { .. }
+            | PtimeError::DirectoryReadError { .. } => 3,
+            _ => 1,
+        }
+    }
+}
