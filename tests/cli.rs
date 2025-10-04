@@ -1,6 +1,7 @@
 use assert_cmd::Command;
 use predicates::prelude::*;
 use std::fs;
+use std::path::Path;
 use tempfile::tempdir;
 
 #[test]
@@ -104,11 +105,6 @@ fn test_hist_width_parameter() {
         .success();
 }
 
-// Note: Testing with actual EXIF data requires JPEG fixtures.
-// For a complete test suite, we would create small JPEG files with specific EXIF data.
-// Since creating valid JPEG files with EXIF is complex, we focus on CLI behavior tests here.
-// Real EXIF testing would be added in production with proper fixture files.
-
 #[test]
 fn test_scan_finds_only_jpegs() {
     let temp = tempdir().unwrap();
@@ -128,4 +124,17 @@ fn test_scan_finds_only_jpegs() {
         .assert()
         .success()
         .stdout(""); // No valid photos = empty output
+}
+
+#[test]
+fn test_latest_with_exif_fixture() {
+    let fixtures = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
+
+    Command::cargo_bin("ptime")
+        .unwrap()
+        .arg("latest")
+        .arg(&fixtures)
+        .assert()
+        .success()
+        .stdout("sample_exif.jpg 2025-06-07\n");
 }

@@ -32,10 +32,12 @@ pub fn read_capture_date(path: &Path) -> Result<Option<NaiveDate>, PtimeError> {
     ];
 
     for tag in &field_tags {
-        if let Some(field) = exif.get_field(*tag, exif::In::PRIMARY) {
-            if let Some(date) = parse_exif_datetime(&field.display_value().to_string()) {
-                return Ok(Some(date));
-            }
+        if let Some(date) = exif
+            .fields()
+            .filter(|field| field.tag == *tag)
+            .find_map(extract_date_from_field)
+        {
+            return Ok(Some(date));
         }
     }
 
@@ -43,26 +45,59 @@ pub fn read_capture_date(path: &Path) -> Result<Option<NaiveDate>, PtimeError> {
     Ok(None)
 }
 
+fn extract_date_from_field(field: &exif::Field) -> Option<NaiveDate> {
+    if let exif::Value::Ascii(ref values) = field.value {
+        for raw in values {
+            if let Ok(text) = std::str::from_utf8(raw) {
+                let trimmed = text.trim_matches('\0').trim();
+                if trimmed.is_empty() {
+                    continue;
+                }
+                if let Some(date) = parse_exif_datetime(trimmed) {
+                    return Some(date);
+                }
+            }
+        }
+    }
+    None
+}
+
 fn parse_exif_datetime(datetime_str: &str) -> Option<NaiveDate> {
     // EXIF datetime format: "YYYY:MM:DD HH:MM:SS"
-    // or sometimes just "YYYY:MM:DD"
+    // or sometimes just "YYYY:MM:DD". Some readers normalize to hyphen.
     let parts: Vec<&str> = datetime_str.split_whitespace().collect();
     if parts.is_empty() {
         return None;
     }
 
     let date_part = parts[0];
-    let date_components: Vec<&str> = date_part.split(':').collect();
+    let separators = [':', '-'];
 
-    if date_components.len() != 3 {
-        return None;
+    for sep in separators {
+        let date_components: Vec<&str> = date_part.split(sep).collect();
+        if date_components.len() != 3 {
+            continue;
+        }
+
+        let year = match date_components[0].parse::<i32>() {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+        let month = match date_components[1].parse::<u32>() {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+        let day = match date_components[2].parse::<u32>() {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+
+        if let Some(date) = NaiveDate::from_ymd_opt(year, month, day) {
+            return Some(date);
+        }
     }
 
-    let year = date_components[0].parse::<i32>().ok()?;
-    let month = date_components[1].parse::<u32>().ok()?;
-    let day = date_components[2].parse::<u32>().ok()?;
-
-    NaiveDate::from_ymd_opt(year, month, day)
+    None
 }
 
 pub fn collect_photos(root: &Path) -> Result<Vec<PhotoMeta>, PtimeError> {
@@ -107,9 +142,14 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_exif_datetime_with_hyphen() {
+        let date = parse_exif_datetime("2020-01-15 10:11:12").unwrap();
+        assert_eq!(date, NaiveDate::from_ymd_opt(2020, 1, 15).unwrap());
+    }
+
+    #[test]
     fn test_parse_exif_datetime_invalid() {
         assert!(parse_exif_datetime("not a date").is_none());
-        assert!(parse_exif_datetime("2023-12-25").is_none()); // wrong separator
         assert!(parse_exif_datetime("2023:13:25 10:00:00").is_none()); // invalid month
         assert!(parse_exif_datetime("").is_none());
     }
