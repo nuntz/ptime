@@ -1,0 +1,1 @@
+// EXIF metadata extraction module
