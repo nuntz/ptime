@@ -24,7 +24,7 @@ pub enum Command {
     /// Show histogram of photos by year
     Hist {
         /// Width of histogram bars (1-200, clamped at 200)
-        #[arg(short, long, default_value = "50")]
+        #[arg(short, long, default_value_t = 50, value_parser = parse_hist_width)]
         width: usize,
         /// Directory to scan (default: current directory)
         directory: Option<PathBuf>,
@@ -35,6 +35,17 @@ pub enum Command {
 pub struct CliCommand {
     pub kind: CommandKind,
     pub directory: PathBuf,
+}
+
+fn parse_hist_width(value: &str) -> Result<usize, String> {
+    let width = value
+        .parse::<usize>()
+        .map_err(|_| format!("Invalid width value: {value}"))?;
+    if width == 0 {
+        Err("Width must be at least 1".to_string())
+    } else {
+        Ok(width)
+    }
 }
 
 #[derive(Debug)]
@@ -61,9 +72,6 @@ impl Cli {
                 (CommandKind::Latest, dir)
             }
             Command::Hist { width, directory } => {
-                if width == 0 {
-                    return Err("Width must be at least 1".to_string());
-                }
                 let clamped_width = width.min(200);
                 let dir = directory.unwrap_or_else(|| PathBuf::from("."));
                 (
@@ -163,15 +171,11 @@ mod tests {
 
     #[test]
     fn test_hist_width_zero_errors() {
-        let cli = Cli {
-            command: Command::Hist {
-                width: 0,
-                directory: None,
-            },
-        };
-        let result = Cli::convert(cli);
+        let args = ["ptime", "hist", "--width", "0"];
+        let result = Cli::try_parse_from(args);
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), "Width must be at least 1");
+        let error = result.unwrap_err();
+        assert_eq!(error.kind(), clap::error::ErrorKind::ValueValidation);
     }
 
     #[test]

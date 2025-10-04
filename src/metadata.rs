@@ -116,8 +116,11 @@ pub fn collect_photos(root: &Path) -> Result<Vec<PhotoMeta>, PtimeError> {
             Ok(None) => {
                 // No date found, skip silently
             }
-            Err(_) => {
-                // Error reading EXIF, skip silently
+            Err(err) => {
+                if matches!(err, PtimeError::Io(_)) {
+                    return Err(err);
+                }
+                // EXIF parsing or metadata issues are non-fatal
             }
         }
     }

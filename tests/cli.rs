@@ -55,7 +55,8 @@ fn test_hist_invalid_width_zero() {
         .arg(temp.path())
         .assert()
         .failure()
-        .stderr(predicate::str::contains("Width must be at least 1"));
+        .code(2)
+        .stderr(predicate::str::contains("invalid value"));
 }
 
 #[test]
@@ -137,4 +138,27 @@ fn test_latest_with_exif_fixture() {
         .assert()
         .success()
         .stdout("sample_exif.jpg 2025-06-07\n");
+}
+
+#[cfg(unix)]
+#[test]
+fn test_permission_denied_propagates_io_error() {
+    use std::fs::Permissions;
+    use std::os::unix::fs::PermissionsExt;
+
+    let temp = tempdir().unwrap();
+    let photo_path = temp.path().join("restricted.jpg");
+    fs::write(&photo_path, b"fake jpeg").unwrap();
+    fs::set_permissions(&photo_path, Permissions::from_mode(0o000)).unwrap();
+
+    Command::cargo_bin("ptime")
+        .unwrap()
+        .arg("oldest")
+        .arg(temp.path())
+        .assert()
+        .failure()
+        .code(3)
+        .stderr(predicate::str::contains("IO error"));
+
+    fs::set_permissions(&photo_path, Permissions::from_mode(0o600)).unwrap();
 }
