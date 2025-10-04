@@ -3,3 +3,5 @@ Ask me one question at a time so we can develop a thorough, step-by-step spec fo
 Here’s the idea:
 
 `ptime` -- a command line solution that scan all the photos in a folder and can display: 1) the oldest photo taken, 2) the most recent photo taken, and 3) a visual histogram showing the number of photos for each year.
+
+Save the output to @SPEC.md
