@@ -174,7 +174,7 @@ Potential improvements for future versions:
 
 ## License
 
-This project is built as a development exercise following the specification in `SPEC.md`.
+MIT.
 
 ## Development
 
